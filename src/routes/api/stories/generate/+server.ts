@@ -3,12 +3,13 @@ import type { RequestHandler } from './$types';
 import { chatCompletion, generateImage } from '$lib/server/openai';
 import { checkDuplicate, computeHash } from '$lib/server/dedup';
 import { detectInputType, extractYouTubeId, fetchUrlContent, fetchYouTubeInfo } from '$lib/server/extract';
+import { getSecret } from '$lib/server/env';
 
 export const POST: RequestHandler = async ({ request, platform }) => {
 	const db = platform?.env?.DB;
 	const storage = platform?.env?.STORAGE;
-	const anthropicKey = platform?.env?.ANTHROPIC_API_KEY;
-	const googleKey = platform?.env?.GOOGLE_API_KEY;
+	const anthropicKey = getSecret(platform, 'ANTHROPIC_API_KEY');
+	const googleKey = getSecret(platform, 'GOOGLE_API_KEY');
 
 	if (!db) return json({ error: 'Database not available' }, { status: 503 });
 	if (!anthropicKey) return json({ error: 'Anthropic API key not configured' }, { status: 503 });

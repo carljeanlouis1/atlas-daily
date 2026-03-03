@@ -1,11 +1,12 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { generateTTS } from '$lib/server/openai';
+import { getSecret } from '$lib/server/env';
 
 export const POST: RequestHandler = async ({ params, platform }) => {
 	const db = platform?.env?.DB;
 	const storage = platform?.env?.STORAGE;
-	const openaiKey = platform?.env?.OPENAI_API_KEY;
+	const openaiKey = getSecret(platform, 'OPENAI_API_KEY');
 
 	if (!db) return json({ error: 'Database not available' }, { status: 503 });
 	if (!openaiKey) return json({ error: 'OpenAI API key not configured' }, { status: 503 });

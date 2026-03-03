@@ -1,6 +1,18 @@
 name = "atlas-daily"
-compatibility_date = "2024-09-23"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = ".svelte-kit/cloudflare"
+
+# Placeholder values — real secrets are set via `wrangler pages secret put`
+# and override these at runtime. Declaring them here ensures the Pages
+# runtime registers the bindings even when wrangler.toml is the source of truth.
+[vars]
+ANTHROPIC_API_KEY = ""
+BRAVE_API_KEY = ""
+GOOGLE_API_KEY = ""
+OPENAI_API_KEY = ""
+XAI_API_KEY = ""
+CRON_SECRET = ""
 
 [[d1_databases]]
 binding = "DB"
