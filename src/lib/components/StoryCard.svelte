@@ -1,12 +1,13 @@
 <script lang="ts">
 	import type { Story } from '$lib/types';
 	import { CATEGORY_CONFIG, type Category } from '$lib/constants';
-	import { timeAgo, readTimeLabel } from '$lib/utils';
+	import { timeAgo, readTimeLabel, freshness } from '$lib/utils';
 	import BookmarkButton from './BookmarkButton.svelte';
 
 	let { story, index = 0 }: { story: Story; index?: number } = $props();
 
 	const config = $derived(CATEGORY_CONFIG[story.category as Category]);
+	const fresh = $derived(freshness(story.published_at));
 </script>
 
 <article
@@ -23,24 +24,40 @@
 					loading="lazy"
 				/>
 				<div class="absolute inset-0 bg-gradient-to-t from-zinc-900 via-zinc-900/20 to-transparent"></div>
-				{#if config}
-					<span
-						class="absolute top-3 left-3 rounded-full px-2.5 py-0.5 text-xs font-semibold backdrop-blur-md {config.bg} {config.color}"
-					>
-						{config.label}
-					</span>
-				{/if}
+				<div class="absolute top-3 left-3 flex items-center gap-2">
+					{#if config}
+						<span
+							class="rounded-full px-2.5 py-0.5 text-xs font-semibold backdrop-blur-md {config.bg} {config.color}"
+						>
+							{config.label}
+						</span>
+					{/if}
+					{#if fresh === 'breaking'}
+						<span class="rounded-full bg-red-500/90 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-md">BREAKING</span>
+					{:else if fresh === 'today'}
+						<span class="rounded-full bg-amber-500/80 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-md">NEW</span>
+					{/if}
+				</div>
 			</div>
 		</a>
 	{/if}
 
 	<div class="p-4 {story.image_url ? 'pt-3' : ''}">
-		{#if !story.image_url && config}
-			<span
-				class="mb-2 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold {config.bg} {config.color}"
-			>
-				{config.label}
-			</span>
+		{#if !story.image_url}
+			<div class="mb-2 flex items-center gap-2">
+				{#if config}
+					<span
+						class="inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold {config.bg} {config.color}"
+					>
+						{config.label}
+					</span>
+				{/if}
+				{#if fresh === 'breaking'}
+					<span class="rounded-full bg-red-500/90 px-2 py-0.5 text-[10px] font-bold text-white">BREAKING</span>
+				{:else if fresh === 'today'}
+					<span class="rounded-full bg-amber-500/80 px-2 py-0.5 text-[10px] font-bold text-white">NEW</span>
+				{/if}
+			</div>
 		{/if}
 
 		<a href="/story/{story.id}" class="block">
@@ -56,7 +73,11 @@
 			<div class="flex items-center gap-2">
 				<span class="font-medium text-zinc-400">{story.source}</span>
 				<span>·</span>
-				<span>{timeAgo(story.published_at)}</span>
+				{#if fresh === 'breaking'}
+					<span class="text-red-400">{timeAgo(story.published_at)}</span>
+				{:else}
+					<span>{timeAgo(story.published_at)}</span>
+				{/if}
 				<span>·</span>
 				<span>{readTimeLabel(story.read_time)}</span>
 			</div>

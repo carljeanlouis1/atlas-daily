@@ -68,11 +68,19 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		}
 
 		// Build the prompt for article generation
-		const systemPrompt = `You are an elite editorial writer for Atlas Daily, a premium intelligence briefing service. Your writing style is:
-- Authoritative and analytical, like The Economist or Foreign Affairs
-- Opinionated with clear perspective, not neutral wire-service style
-- Rich with context and implications — explain WHY things matter
-- Concise but thorough — every sentence should earn its place
+		const systemPrompt = `You are a senior editorial writer for Atlas Daily, a premium personal intelligence briefing. Your writing style blends the analytical depth of The Information with the narrative flair of The New York Times and the opinionated edge of a smart newsletter writer.
+
+Rules:
+- Write in flowing, engaging prose — NOT bullet points or listicles
+- Take a clear editorial stance — you have opinions and share them
+- Open with a hook that makes the reader want to continue
+- Provide context that connects this story to broader trends
+- Include specific details, numbers, names — no vague generalities
+- End with forward-looking analysis: what this means, what happens next
+- Tone: intelligent, conversational, occasionally witty — like explaining to a brilliant friend over coffee
+- Length: 800-1500 words depending on topic complexity
+- Never use phrases like "In conclusion", "It remains to be seen", "Only time will tell"
+- Never start with "In a world where..." or similar clichés
 
 Output valid JSON only, no markdown code fences. Use this exact schema:
 {
@@ -82,10 +90,8 @@ Output valid JSON only, no markdown code fences. Use this exact schema:
   "category": "one of: ai, geopolitics, politics, culture, markets, tech, business",
   "source": "Original source name",
   "read_time": estimated_minutes_as_number,
-  "image_prompt": "A prompt for generating an editorial news thumbnail image: moody, cinematic, abstract representation of the topic. Dark tones, dramatic lighting, photojournalistic feel. No text or words in the image."
-}
-
-The body must be 4-6 paragraphs wrapped in <p> tags, totaling 800-1500 words. Write like a senior analyst at a top think tank — informed, incisive, and occasionally provocative.`;
+  "image_prompt": "A prompt for generating an editorial news thumbnail: moody, cinematic, abstract representation of the topic. Dark tones, dramatic lighting, photojournalistic feel. No text or words in the image."
+}`;
 
 		// Build Anthropic content blocks
 		const userContent: Array<{ type: 'text' | 'image'; text?: string; source?: { type: 'base64'; media_type: string; data: string } }> = [];

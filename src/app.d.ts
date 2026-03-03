@@ -7,6 +7,8 @@ declare global {
 				ANTHROPIC_API_KEY: string;
 				GOOGLE_API_KEY: string;
 				OPENAI_API_KEY: string;
+				BRAVE_API_KEY: string;
+				CRON_SECRET: string;
 				ATLAS_DAILY_API_KEY: string;
 			};
 		}

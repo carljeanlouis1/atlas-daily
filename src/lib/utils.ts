@@ -24,3 +24,12 @@ export function formatDate(dateString: string): string {
 export function readTimeLabel(minutes: number): string {
 	return `${minutes} min read`;
 }
+
+export function freshness(dateString: string): 'breaking' | 'today' | 'recent' {
+	const date = new Date(dateString);
+	const now = new Date();
+	const hours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+	if (hours < 2) return 'breaking';
+	if (hours < 24) return 'today';
+	return 'recent';
+}
