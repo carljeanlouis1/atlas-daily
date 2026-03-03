@@ -32,7 +32,7 @@ export const POST: RequestHandler = async ({ params, platform }) => {
 			await storage.put(audioKey, audioBuffer, {
 				httpMetadata: { contentType: 'audio/mpeg' }
 			});
-			audioUrl = `/api/r2/${audioKey}`;
+			audioUrl = `https://pub-2049fec7caa24f8ebe3bc824e0ab04e5.r2.dev/${audioKey}`;
 		} else {
 			// Fallback: return as data URL (not ideal for prod)
 			const b64 = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));

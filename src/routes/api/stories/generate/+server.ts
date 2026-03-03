@@ -147,7 +147,7 @@ Output valid JSON only, no markdown code fences. Use this exact schema:
 					await storage.put(imageKey, imageBytes, {
 						httpMetadata: { contentType: 'image/png' }
 					});
-					imageUrl = `/api/r2/${imageKey}`;
+					imageUrl = `https://pub-2049fec7caa24f8ebe3bc824e0ab04e5.r2.dev/${imageKey}`;
 				}
 			} catch (err) {
 				console.error('Image generation failed:', err);

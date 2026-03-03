@@ -161,7 +161,7 @@ async function generateAndStoreImage(
 		await storage.put(imageKey, imageBytes, {
 			httpMetadata: { contentType: 'image/png' }
 		});
-		return `/api/r2/${imageKey}`;
+		return `https://pub-2049fec7caa24f8ebe3bc824e0ab04e5.r2.dev/${imageKey}`;
 	} catch {
 		return null;
 	}
