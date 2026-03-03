@@ -8,6 +8,7 @@
 	let currentTime = $state(0);
 	let duration = $state(0);
 	let speed = $state(1);
+	let seeking = $state(false);
 
 	const speeds = [0.75, 1, 1.25, 1.5, 2];
 
@@ -21,10 +22,20 @@
 		playing = !playing;
 	}
 
-	function seek(e: Event) {
+	function onSeekStart() {
+		seeking = true;
+	}
+
+	function onSeekInput(e: Event) {
+		const target = e.target as HTMLInputElement;
+		currentTime = parseFloat(target.value);
+	}
+
+	function onSeekEnd(e: Event) {
 		if (!audio) return;
 		const target = e.target as HTMLInputElement;
 		audio.currentTime = parseFloat(target.value);
+		seeking = false;
 	}
 
 	function skip(seconds: number) {
@@ -55,7 +66,7 @@
 		<audio
 			bind:this={audio}
 			{src}
-			ontimeupdate={() => { if (audio) currentTime = audio.currentTime; }}
+			ontimeupdate={() => { if (audio && !seeking) currentTime = audio.currentTime; }}
 			onloadedmetadata={() => { if (audio) duration = audio.duration; }}
 			onended={() => { playing = false; }}
 		></audio>
@@ -66,9 +77,14 @@
 				type="range"
 				min="0"
 				max={duration || 0}
+				step="0.1"
 				value={currentTime}
-				oninput={seek}
-				class="h-1 w-full cursor-pointer appearance-none rounded-full bg-zinc-700 accent-zinc-100"
+				onmousedown={onSeekStart}
+				ontouchstart={onSeekStart}
+				oninput={onSeekInput}
+				onchange={onSeekEnd}
+				class="audio-seek h-2 w-full cursor-pointer appearance-none rounded-full bg-zinc-700"
+				style="touch-action: none;"
 			/>
 			<div class="mt-1 flex justify-between text-xs text-zinc-500">
 				<span>{formatTime(currentTime)}</span>
@@ -78,7 +94,6 @@
 
 		<!-- Controls -->
 		<div class="flex items-center justify-center gap-4">
-			<!-- Speed -->
 			<button
 				onclick={cycleSpeed}
 				class="rounded-lg px-2 py-1 text-xs font-semibold text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-200"
@@ -86,7 +101,6 @@
 				{speed}x
 			</button>
 
-			<!-- Skip back -->
 			<button
 				onclick={() => skip(-15)}
 				class="flex items-center justify-center text-zinc-400 transition-colors hover:text-zinc-200"
@@ -98,7 +112,6 @@
 				<span class="ml-0.5 text-[10px] font-bold">15</span>
 			</button>
 
-			<!-- Play/Pause -->
 			<button
 				onclick={togglePlay}
 				class="flex h-12 w-12 items-center justify-center rounded-full bg-zinc-100 text-zinc-900 transition-transform hover:scale-105 active:scale-95"
@@ -114,7 +127,6 @@
 				{/if}
 			</button>
 
-			<!-- Skip forward -->
 			<button
 				onclick={() => skip(15)}
 				class="flex items-center justify-center text-zinc-400 transition-colors hover:text-zinc-200"
@@ -126,8 +138,27 @@
 				</svg>
 			</button>
 
-			<!-- Spacer to balance layout -->
 			<div class="w-8"></div>
 		</div>
 	</div>
 {/if}
+
+<style>
+	.audio-seek::-webkit-slider-thumb {
+		-webkit-appearance: none;
+		appearance: none;
+		width: 18px;
+		height: 18px;
+		border-radius: 50%;
+		background: #f4f4f5;
+		cursor: pointer;
+	}
+	.audio-seek::-moz-range-thumb {
+		width: 18px;
+		height: 18px;
+		border-radius: 50%;
+		background: #f4f4f5;
+		cursor: pointer;
+		border: none;
+	}
+</style>
