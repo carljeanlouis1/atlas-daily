@@ -92,7 +92,7 @@ Output valid JSON only, no markdown code fences. Use this exact schema:
 		if (type === 'image') {
 			userContent.push({
 				type: 'image',
-				source: { type: 'base64', media_type: 'image/jpeg', data: content }
+				source: { type: 'base64', media_type: (content.startsWith('/9j') ? 'image/jpeg' : content.startsWith('iVBOR') ? 'image/png' : content.startsWith('R0lG') ? 'image/gif' : content.startsWith('UklG') ? 'image/webp' : 'image/png'), data: content }
 			});
 			userContent.push({
 				type: 'text',
