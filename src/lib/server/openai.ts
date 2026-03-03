@@ -21,7 +21,7 @@ export async function chatCompletion(
 			'Content-Type': 'application/json'
 		},
 		body: JSON.stringify({
-			model: options.model || 'claude-sonnet-4-6-20250514',
+			model: options.model || 'claude-sonnet-4-5-20250929',
 			max_tokens: options.max_tokens ?? 4096,
 			temperature: options.temperature ?? 0.7,
 			system: systemPrompt,

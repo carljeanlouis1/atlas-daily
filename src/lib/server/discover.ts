@@ -53,7 +53,7 @@ interface XTrend {
 }
 
 async function searchXTwitter(category: string, xaiKey: string): Promise<XTrend[]> {
-	const res = await fetch('https://api.x.ai/v1/chat/completions', {
+	const res = await fetch('https://api.x.ai/v1/responses', {
 		method: 'POST',
 		headers: {
 			Authorization: `Bearer ${xaiKey}`,
@@ -61,7 +61,8 @@ async function searchXTwitter(category: string, xaiKey: string): Promise<XTrend[
 		},
 		body: JSON.stringify({
 			model: 'grok-4-1-fast',
-			messages: [
+			stream: false,
+			input: [
 				{
 					role: 'user',
 					content: `What are the top 3 breaking or trending stories on X/Twitter right now about ${category}? For each, give me: the topic, a one-line summary, the key tweets/sources, and why it matters. Focus on the last 12 hours.
@@ -70,7 +71,7 @@ Return ONLY valid JSON, no markdown fences. Use this schema:
 [{"topic": "...", "summary": "...", "sources": "key accounts/tweets discussing this"}]`
 				}
 			],
-			search_parameters: { mode: 'auto', sources: [{ type: 'x' }] }
+			tools: [{ type: 'x_search' }]
 		})
 	});
 
@@ -80,10 +81,12 @@ Return ONLY valid JSON, no markdown fences. Use this schema:
 	}
 
 	const data = await res.json() as {
-		choices: Array<{ message: { content: string } }>;
+		output: Array<{ type: string; content?: Array<{ type: string; text?: string }> }>;
 	};
 
-	const content = data.choices?.[0]?.message?.content;
+	const msgOutput = data.output?.find((o: any) => o.type === 'message');
+	const textContent = msgOutput?.content?.find((c: any) => c.type === 'text');
+	const content = textContent?.text;
 	if (!content) return [];
 
 	try {
