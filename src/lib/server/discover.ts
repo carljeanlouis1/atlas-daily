@@ -3,23 +3,32 @@ import { checkDuplicate, computeHash } from './dedup';
 import { fetchUrlContent } from './extract';
 
 const SEARCH_QUERIES: Record<string, string[]> = {
-	ai: ['latest AI news today', 'artificial intelligence breakthroughs'],
-	geopolitics: ['geopolitics news today', 'international relations developments'],
-	politics: ['US politics news today', 'political developments'],
-	tech: ['technology news today', 'tech industry'],
-	markets: ['stock market news today', 'financial markets'],
-	culture: ['culture news today', 'entertainment industry'],
-	business: ['business news today', 'startups funding']
+	ai: ['breaking AI news today site:theverge.com OR site:techcrunch.com OR site:reuters.com', 'OpenAI OR Anthropic OR Google AI OR Meta AI announcement today', 'AI model release OR AI funding OR AI regulation news'],
+	geopolitics: ['breaking international news today site:reuters.com OR site:bbc.com', 'US China Russia war sanctions conflict latest', 'Middle East conflict latest developments'],
+	politics: ['breaking US politics news today', 'Congress White House executive order latest', 'Trump Biden policy announcement today'],
+	tech: ['breaking technology news today site:theverge.com OR site:arstechnica.com', 'Apple Google Microsoft Amazon launch release announcement', 'startup funding acquisition IPO today'],
+	markets: ['stock market breaking news today site:cnbc.com OR site:bloomberg.com', 'S&P 500 earnings report market crash rally', 'crypto bitcoin ethereum breaking news'],
+	culture: ['breaking entertainment news today', 'viral social media controversy trending', 'streaming movies TV shows premiere release'],
+	business: ['business deal merger acquisition today site:reuters.com', 'layoffs hiring company earnings report', 'startup unicorn funding round announcement']
 };
 
 const SYSTEM_PROMPT = `You are a senior editorial writer for Atlas Daily, a premium personal intelligence briefing. Your writing style blends the analytical depth of The Information with the narrative flair of The New York Times and the opinionated edge of a smart newsletter writer.
 
-Rules:
+CRITICAL RULES FOR HEADLINES:
+- Headlines must read like REAL NEWS HEADLINES from NYT, Bloomberg, or The Information
+- Good: "Sam Altman Admits Pentagon Deal 'Looked Opportunistic and Sloppy' as ChatGPT Users Revolt"
+- Good: "AWS Data Centers Hit by Iranian Drones in First-Ever Military Strike on Major Cloud Provider"
+- Bad: "The AI Rivalry Between OpenAI and Anthropic" (too generic, not news)
+- Bad: "Wall Street's AI Revolution" (vague statement, not a headline)
+- Headlines should reference SPECIFIC events, people, companies, numbers, or dates
+- Headlines should make someone want to click because something HAPPENED, not because a topic EXISTS
+
+ARTICLE RULES:
 - Write in flowing, engaging prose — NOT bullet points or listicles
 - Take a clear editorial stance — you have opinions and share them
-- Open with a hook that makes the reader want to continue
+- Open with the NEWS: what happened, who did it, when, why it matters
+- Include specific details, numbers, names, dates, dollar amounts — no vague generalities
 - Provide context that connects this story to broader trends
-- Include specific details, numbers, names — no vague generalities
 - End with forward-looking analysis: what this means, what happens next
 - Tone: intelligent, conversational, occasionally witty — like explaining to a brilliant friend over coffee
 - Length: 800-1500 words depending on topic complexity
@@ -28,8 +37,8 @@ Rules:
 
 Output valid JSON only, no markdown code fences. Use this exact schema:
 {
-  "title": "Compelling headline (max 100 chars)",
-  "summary": "2-3 sentence hook that captures the key insight (150-250 chars)",
+  "title": "NEWS HEADLINE — specific event, person, or number (max 120 chars)",
+  "summary": "2-3 sentence hook that captures the key NEWS and why it matters (150-300 chars)",
   "body": "<p>Paragraph 1...</p><p>Paragraph 2...</p><p>Paragraph 3...</p><p>Paragraph 4...</p>",
   "category": "one of: ai, geopolitics, politics, culture, markets, tech, business",
   "source": "Original source name",
