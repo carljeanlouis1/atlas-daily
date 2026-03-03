@@ -1,7 +1,5 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
-	import { goto } from '$app/navigation';
-	import { CATEGORIES, CATEGORY_CONFIG, type Category } from '$lib/constants';
+	import { CATEGORIES, CATEGORY_CONFIG } from '$lib/constants';
 
 	let inputMode = $state<'text' | 'url' | 'image'>('text');
 	let textContent = $state('');
@@ -9,22 +7,10 @@
 	let imageData = $state<string | null>(null);
 	let imageName = $state('');
 	let category = $state('');
-	let apiKey = $state('');
 	let submitting = $state(false);
 	let error = $state('');
 	let success = $state<{ id: string; title: string } | null>(null);
 	let dragOver = $state(false);
-
-	// Load saved API key
-	$effect(() => {
-		if (browser) {
-			apiKey = localStorage.getItem('atlas-api-key') || '';
-		}
-	});
-
-	function saveApiKey() {
-		if (browser) localStorage.setItem('atlas-api-key', apiKey);
-	}
 
 	function handleFileSelect(e: Event) {
 		const input = e.target as HTMLInputElement;
@@ -50,7 +36,7 @@
 		const reader = new FileReader();
 		reader.onload = () => {
 			const result = reader.result as string;
-			imageData = result.split(',')[1]; // Remove data:... prefix
+			imageData = result.split(',')[1];
 		};
 		reader.readAsDataURL(file);
 	}
@@ -67,11 +53,6 @@
 		error = '';
 		success = null;
 
-		if (!apiKey) {
-			error = 'API key is required';
-			return;
-		}
-
 		let type: 'text' | 'url' | 'image' = inputMode;
 		let content = '';
 
@@ -86,16 +67,12 @@
 			content = imageData;
 		}
 
-		saveApiKey();
 		submitting = true;
 
 		try {
 			const res = await fetch('/api/stories/generate', {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'X-API-Key': apiKey
-				},
+				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					type,
 					content,
@@ -116,7 +93,6 @@
 
 			success = { id: data.story.id, title: data.story.title };
 
-			// Clear form
 			textContent = '';
 			urlContent = '';
 			imageData = null;
@@ -146,18 +122,6 @@
 
 	<h1 class="mb-2 text-2xl font-bold tracking-tight text-zinc-100">Submit a Story</h1>
 	<p class="mb-8 text-sm text-zinc-500">Paste text, a URL, or upload a screenshot — AI will write the full article.</p>
-
-	<!-- API Key -->
-	<div class="mb-6">
-		<label for="apikey" class="mb-1.5 block text-sm font-medium text-zinc-400">API Key</label>
-		<input
-			id="apikey"
-			type="password"
-			bind:value={apiKey}
-			placeholder="Enter your API key"
-			class="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm text-zinc-100 placeholder-zinc-600 outline-none transition-colors focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600"
-		/>
-	</div>
 
 	<!-- Input Mode Tabs -->
 	<div class="mb-6 flex gap-1 rounded-xl bg-zinc-900 p-1">

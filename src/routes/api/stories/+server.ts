@@ -48,11 +48,6 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	const db = platform?.env?.DB;
 	if (!db) return json({ error: 'Database not available' }, { status: 503 });
 
-	const apiKey = request.headers.get('X-API-Key');
-	if (!apiKey || apiKey !== platform?.env?.ATLAS_DAILY_API_KEY) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
-	}
-
 	const story = await request.json();
 	const id = story.id || crypto.randomUUID();
 

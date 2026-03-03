@@ -9,16 +9,9 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	const storage = platform?.env?.STORAGE;
 	const anthropicKey = platform?.env?.ANTHROPIC_API_KEY;
 	const googleKey = platform?.env?.GOOGLE_API_KEY;
-	const apiKey = platform?.env?.ATLAS_DAILY_API_KEY;
 
 	if (!db) return json({ error: 'Database not available' }, { status: 503 });
 	if (!anthropicKey) return json({ error: 'Anthropic API key not configured' }, { status: 503 });
-
-	// Auth check
-	const reqKey = request.headers.get('X-API-Key');
-	if (!reqKey || reqKey !== apiKey) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
-	}
 
 	const body = await request.json();
 	const { type, content, category: forcedCategory } = body as {

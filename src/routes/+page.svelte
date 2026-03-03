@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
 	import type { Story } from '$lib/types';
 	import { PAGE_SIZE } from '$lib/constants';
 	import StoryCard from '$lib/components/StoryCard.svelte';
@@ -58,13 +57,6 @@
 	}
 
 	async function discover() {
-		if (!browser) return;
-		const apiKey = localStorage.getItem('atlas-api-key');
-		if (!apiKey) {
-			discoverError = 'Set your API key on the Submit page first';
-			return;
-		}
-
 		discovering = true;
 		discoverError = '';
 		discoverCount = 0;
@@ -75,10 +67,7 @@
 
 			const res = await fetch('/api/stories/discover', {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'X-API-Key': apiKey
-				},
+				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(body)
 			});
 
