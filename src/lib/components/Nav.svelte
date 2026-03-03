@@ -21,16 +21,27 @@
 			<span class="text-lg">🌐</span>
 			<span>{APP_NAME}</span>
 		</a>
-		<nav class="hidden gap-1 sm:flex">
-			{#each navItems as item}
-				<a
-					href={item.href}
-					class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors {isActive(item.href) ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-400 hover:text-zinc-200'}"
-				>
-					{item.label}
-				</a>
-			{/each}
-		</nav>
+		<div class="flex items-center gap-1">
+			<nav class="hidden gap-1 sm:flex">
+				{#each navItems as item}
+					<a
+						href={item.href}
+						class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors {isActive(item.href) ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-400 hover:text-zinc-200'}"
+					>
+						{item.label}
+					</a>
+				{/each}
+			</nav>
+			<a
+				href="/submit"
+				class="ml-2 flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-100 text-zinc-900 transition-all hover:bg-white hover:scale-105 active:scale-95"
+				aria-label="Submit story"
+			>
+				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+				</svg>
+			</a>
+		</div>
 	</div>
 </header>
 
@@ -40,7 +51,7 @@
 		{#each navItems as item}
 			<a
 				href={item.href}
-				class="flex flex-col items-center gap-0.5 px-4 py-1 text-xs font-medium transition-colors {isActive(item.href) ? 'text-zinc-100' : 'text-zinc-500'}"
+				class="flex flex-col items-center gap-0.5 px-3 py-1 text-xs font-medium transition-colors {isActive(item.href) ? 'text-zinc-100' : 'text-zinc-500'}"
 			>
 				{#if item.icon === 'feed'}
 					<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
@@ -58,5 +69,14 @@
 				<span>{item.label}</span>
 			</a>
 		{/each}
+		<a
+			href="/submit"
+			class="flex flex-col items-center gap-0.5 px-3 py-1 text-xs font-medium transition-colors {isActive('/submit') ? 'text-zinc-100' : 'text-zinc-500'}"
+		>
+			<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+			</svg>
+			<span>Submit</span>
+		</a>
 	</div>
 </nav>

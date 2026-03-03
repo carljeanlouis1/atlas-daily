@@ -10,8 +10,12 @@ CREATE TABLE IF NOT EXISTS stories (
   source_url TEXT,
   published_at TEXT NOT NULL,
   read_time INTEGER DEFAULT 5,
+  content_hash TEXT,
+  input_type TEXT,
+  original_input TEXT,
   created_at TEXT DEFAULT (datetime('now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_stories_category ON stories(category);
 CREATE INDEX IF NOT EXISTS idx_stories_published_at ON stories(published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_stories_content_hash ON stories(content_hash);

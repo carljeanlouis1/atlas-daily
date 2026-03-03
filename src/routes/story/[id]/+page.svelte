@@ -9,6 +9,28 @@
 
 	let { data } = $props();
 	const config = $derived(CATEGORY_CONFIG[data.story.category as Category]);
+
+	let audioUrl = $state<string | null>(data.story.audio_url);
+	let generatingAudio = $state(false);
+	let audioError = $state('');
+
+	async function generateAudio() {
+		generatingAudio = true;
+		audioError = '';
+		try {
+			const res = await fetch(`/api/stories/${data.story.id}/audio`, { method: 'POST' });
+			const result = await res.json();
+			if (!res.ok) {
+				audioError = result.error || 'Failed to generate audio';
+				return;
+			}
+			audioUrl = result.audio_url;
+		} catch {
+			audioError = 'Network error generating audio';
+		} finally {
+			generatingAudio = false;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -85,12 +107,37 @@
 		</div>
 	</div>
 
-	<!-- Audio player -->
-	{#if data.story.audio_url}
-		<div class="mb-8">
-			<AudioPlayer src={data.story.audio_url} />
-		</div>
-	{/if}
+	<!-- Audio player or Listen button -->
+	<div class="mb-8">
+		{#if audioUrl}
+			<AudioPlayer src={audioUrl} />
+		{:else}
+			<button
+				onclick={generateAudio}
+				disabled={generatingAudio}
+				class="flex w-full items-center justify-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm font-medium text-zinc-300 transition-all hover:border-zinc-700 hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed"
+			>
+				{#if generatingAudio}
+					<svg class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+					</svg>
+					Generating audio...
+				{:else}
+					<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+					</svg>
+					Listen to this article
+				{/if}
+			</button>
+			{#if audioError}
+				<p class="mt-2 text-center text-xs text-rose-400">{audioError}</p>
+			{/if}
+			{#if generatingAudio}
+				<p class="mt-2 text-center text-xs text-zinc-600">Generating audio with AI — this may take 15-30 seconds</p>
+			{/if}
+		{/if}
+	</div>
 
 	<!-- Body -->
 	<div class="prose-atlas text-base leading-relaxed text-zinc-300 [&>p]:mb-4">

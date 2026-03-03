@@ -5,3 +5,7 @@ compatibility_date = "2024-09-23"
 binding = "DB"
 database_name = "atlas-daily-db"
 database_id = "4b727b1b-6743-48a2-991a-98de63a9eb84"
+
+[[r2_buckets]]
+binding = "STORAGE"
+bucket_name = "atlas-daily-storage"

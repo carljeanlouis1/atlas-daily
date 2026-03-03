@@ -86,8 +86,18 @@
 	</div>
 {:else if stories.length === 0}
 	<div class="mt-16 text-center">
-		<p class="text-lg text-zinc-500">No stories found</p>
-		<p class="mt-1 text-sm text-zinc-600">Check back soon for new content</p>
+		<div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-900 text-3xl">🌐</div>
+		<p class="text-lg font-medium text-zinc-400">No stories yet</p>
+		<p class="mt-1 text-sm text-zinc-600">Submit your first story to get started</p>
+		<a
+			href="/submit"
+			class="mt-4 inline-flex items-center gap-2 rounded-xl bg-zinc-100 px-5 py-2.5 text-sm font-semibold text-zinc-900 transition-all hover:bg-white"
+		>
+			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+			</svg>
+			Submit a Story
+		</a>
 	</div>
 {:else}
 	<div class="mt-4 grid gap-5">
