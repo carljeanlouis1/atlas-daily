@@ -1,65 +1,91 @@
 const OPENAI_API = 'https://api.openai.com/v1';
+const ANTHROPIC_API = 'https://api.anthropic.com/v1';
 
-interface ChatMessage {
-	role: 'system' | 'user' | 'assistant';
-	content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
+interface AnthropicContentBlock {
+	type: 'text' | 'image';
+	text?: string;
+	source?: { type: 'base64'; media_type: string; data: string };
 }
 
 export async function chatCompletion(
 	apiKey: string,
-	messages: ChatMessage[],
+	systemPrompt: string,
+	userContent: AnthropicContentBlock[],
 	options: { model?: string; temperature?: number; max_tokens?: number } = {}
 ): Promise<string> {
-	const res = await fetch(`${OPENAI_API}/chat/completions`, {
+	const res = await fetch(`${ANTHROPIC_API}/messages`, {
 		method: 'POST',
 		headers: {
-			Authorization: `Bearer ${apiKey}`,
+			'x-api-key': apiKey,
+			'anthropic-version': '2023-06-01',
 			'Content-Type': 'application/json'
 		},
 		body: JSON.stringify({
-			model: options.model || 'gpt-4o',
-			messages,
+			model: options.model || 'claude-sonnet-4-6-20250514',
+			max_tokens: options.max_tokens ?? 4096,
 			temperature: options.temperature ?? 0.7,
-			max_tokens: options.max_tokens ?? 4096
+			system: systemPrompt,
+			messages: [
+				{ role: 'user', content: userContent }
+			]
 		})
 	});
 
 	if (!res.ok) {
 		const err = await res.text();
-		throw new Error(`OpenAI API error (${res.status}): ${err}`);
+		throw new Error(`Anthropic API error (${res.status}): ${err}`);
 	}
 
-	const data = await res.json() as { choices: Array<{ message: { content: string } }> };
-	return data.choices[0].message.content;
+	const data = await res.json() as { content: Array<{ type: string; text: string }> };
+	const textBlock = data.content.find((b) => b.type === 'text');
+	if (!textBlock) throw new Error('No text response from Anthropic');
+	return textBlock.text;
 }
 
 export async function generateImage(
 	apiKey: string,
 	prompt: string
 ): Promise<string> {
-	const res = await fetch(`${OPENAI_API}/images/generations`, {
-		method: 'POST',
-		headers: {
-			Authorization: `Bearer ${apiKey}`,
-			'Content-Type': 'application/json'
-		},
-		body: JSON.stringify({
-			model: 'dall-e-3',
-			prompt,
-			n: 1,
-			size: '1792x1024',
-			quality: 'standard',
-			response_format: 'b64_json'
-		})
-	});
+	const res = await fetch(
+		`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${apiKey}`,
+		{
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				contents: [
+					{
+						parts: [
+							{ text: prompt }
+						]
+					}
+				],
+				generationConfig: {
+					responseModalities: ['TEXT', 'IMAGE']
+				}
+			})
+		}
+	);
 
 	if (!res.ok) {
 		const err = await res.text();
-		throw new Error(`DALL-E API error (${res.status}): ${err}`);
+		throw new Error(`Gemini image API error (${res.status}): ${err}`);
 	}
 
-	const data = await res.json() as { data: Array<{ b64_json: string }> };
-	return data.data[0].b64_json;
+	const data = await res.json() as {
+		candidates: Array<{
+			content: {
+				parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }>;
+			};
+		}>;
+	};
+
+	const parts = data.candidates?.[0]?.content?.parts;
+	if (!parts) throw new Error('No response from Gemini image API');
+
+	const imagePart = parts.find((p) => p.inlineData);
+	if (!imagePart?.inlineData) throw new Error('No image data in Gemini response');
+
+	return imagePart.inlineData.data;
 }
 
 export async function generateTTS(

@@ -7,11 +7,12 @@ import { detectInputType, extractYouTubeId, fetchUrlContent, fetchYouTubeInfo } 
 export const POST: RequestHandler = async ({ request, platform }) => {
 	const db = platform?.env?.DB;
 	const storage = platform?.env?.STORAGE;
-	const openaiKey = platform?.env?.OPENAI_API_KEY;
+	const anthropicKey = platform?.env?.ANTHROPIC_API_KEY;
+	const googleKey = platform?.env?.GOOGLE_API_KEY;
 	const apiKey = platform?.env?.ATLAS_DAILY_API_KEY;
 
 	if (!db) return json({ error: 'Database not available' }, { status: 503 });
-	if (!openaiKey) return json({ error: 'OpenAI API key not configured' }, { status: 503 });
+	if (!anthropicKey) return json({ error: 'Anthropic API key not configured' }, { status: 503 });
 
 	// Auth check
 	const reqKey = request.headers.get('X-API-Key');
@@ -81,19 +82,20 @@ Output valid JSON only, no markdown code fences. Use this exact schema:
   "category": "one of: ai, geopolitics, politics, culture, markets, tech, business",
   "source": "Original source name",
   "read_time": estimated_minutes_as_number,
-  "image_prompt": "DALL-E prompt for an editorial illustration: moody, cinematic, abstract representation of the topic. Dark tones, dramatic lighting, photojournalistic feel. No text or words in the image."
+  "image_prompt": "A prompt for generating an editorial news thumbnail image: moody, cinematic, abstract representation of the topic. Dark tones, dramatic lighting, photojournalistic feel. No text or words in the image."
 }
 
 The body must be 4-6 paragraphs wrapped in <p> tags, totaling 800-1500 words. Write like a senior analyst at a top think tank — informed, incisive, and occasionally provocative.`;
 
-		const userMessages: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
+		// Build Anthropic content blocks
+		const userContent: Array<{ type: 'text' | 'image'; text?: string; source?: { type: 'base64'; media_type: string; data: string } }> = [];
 
 		if (type === 'image') {
-			userMessages.push({
-				type: 'image_url',
-				image_url: { url: `data:image/jpeg;base64,${content}` }
+			userContent.push({
+				type: 'image',
+				source: { type: 'base64', media_type: 'image/jpeg', data: content }
 			});
-			userMessages.push({
+			userContent.push({
 				type: 'text',
 				text: 'Analyze this screenshot/image and write a full analytical article about the news or topic shown. Detect the appropriate category.'
 			});
@@ -102,13 +104,10 @@ The body must be 4-6 paragraphs wrapped in <p> tags, totaling 800-1500 words. Wr
 			if (forcedCategory) {
 				prompt += `\n\nUse category: ${forcedCategory}`;
 			}
-			userMessages.push({ type: 'text', text: prompt });
+			userContent.push({ type: 'text', text: prompt });
 		}
 
-		const result = await chatCompletion(openaiKey, [
-			{ role: 'system', content: systemPrompt },
-			{ role: 'user', content: userMessages }
-		]);
+		const result = await chatCompletion(anthropicKey, systemPrompt, userContent);
 
 		// Parse the JSON response — handle potential markdown fences
 		const cleaned = result.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
@@ -137,21 +136,22 @@ The body must be 4-6 paragraphs wrapped in <p> tags, totaling 800-1500 words. Wr
 			return json({ error: dupCheck.reason, duplicate: true }, { status: 409 });
 		}
 
-		// Generate image
+		// Generate image via Gemini
 		let imageUrl: string | null = null;
-		try {
-			const imageB64 = await generateImage(openaiKey, article.image_prompt);
-			if (storage) {
-				const imageKey = `images/${crypto.randomUUID()}.png`;
-				const imageBytes = Uint8Array.from(atob(imageB64), (c) => c.charCodeAt(0));
-				await storage.put(imageKey, imageBytes, {
-					httpMetadata: { contentType: 'image/png' }
-				});
-				imageUrl = `/api/r2/${imageKey}`;
+		if (googleKey) {
+			try {
+				const imageB64 = await generateImage(googleKey, article.image_prompt);
+				if (storage) {
+					const imageKey = `images/${crypto.randomUUID()}.png`;
+					const imageBytes = Uint8Array.from(atob(imageB64), (c) => c.charCodeAt(0));
+					await storage.put(imageKey, imageBytes, {
+						httpMetadata: { contentType: 'image/png' }
+					});
+					imageUrl = `/api/r2/${imageKey}`;
+				}
+			} catch (err) {
+				console.error('Image generation failed:', err);
 			}
-		} catch (err) {
-			console.error('Image generation failed:', err);
-			// Continue without image
 		}
 
 		// Insert story

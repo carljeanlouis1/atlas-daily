@@ -4,6 +4,8 @@ declare global {
 			env: {
 				DB: D1Database;
 				STORAGE: R2Bucket;
+				ANTHROPIC_API_KEY: string;
+				GOOGLE_API_KEY: string;
 				OPENAI_API_KEY: string;
 				ATLAS_DAILY_API_KEY: string;
 			};
