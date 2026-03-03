@@ -8,6 +8,12 @@
 
 	const config = $derived(CATEGORY_CONFIG[story.category as Category]);
 	const fresh = $derived(freshness(story.published_at));
+	const sourceType = $derived(
+		story.input_type === 'x-trend' ? 'x'
+		: story.input_type === 'discover' ? 'web'
+		: story.input_type ? 'submitted'
+		: null
+	);
 </script>
 
 <article
@@ -37,6 +43,9 @@
 					{:else if fresh === 'today'}
 						<span class="rounded-full bg-amber-500/80 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-md">NEW</span>
 					{/if}
+					{#if sourceType === 'x'}
+						<span class="rounded-full bg-zinc-900/80 px-2 py-0.5 text-[10px] font-bold text-sky-400 backdrop-blur-md">🔥 Trending on X</span>
+					{/if}
 				</div>
 			</div>
 		</a>
@@ -57,6 +66,9 @@
 				{:else if fresh === 'today'}
 					<span class="rounded-full bg-amber-500/80 px-2 py-0.5 text-[10px] font-bold text-white">NEW</span>
 				{/if}
+				{#if sourceType === 'x'}
+					<span class="rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold text-sky-400">🔥 Trending on X</span>
+				{/if}
 			</div>
 		{/if}
 
@@ -72,6 +84,13 @@
 		<div class="flex items-center justify-between text-xs text-zinc-500">
 			<div class="flex items-center gap-2">
 				<span class="font-medium text-zinc-400">{story.source}</span>
+				{#if sourceType === 'x'}
+					<span class="text-sky-500">via X</span>
+				{:else if sourceType === 'web'}
+					<span>via Web</span>
+				{:else if sourceType === 'submitted'}
+					<span>Submitted</span>
+				{/if}
 				<span>·</span>
 				{#if fresh === 'breaking'}
 					<span class="text-red-400">{timeAgo(story.published_at)}</span>

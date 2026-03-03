@@ -41,7 +41,60 @@ interface SearchResult {
 	title: string;
 	url: string;
 	description: string;
+	source: 'x' | 'web' | 'submitted';
 }
+
+// --- X/Twitter search via xAI Grok ---
+
+interface XTrend {
+	topic: string;
+	summary: string;
+	sources: string;
+}
+
+async function searchXTwitter(category: string, xaiKey: string): Promise<XTrend[]> {
+	const res = await fetch('https://api.x.ai/v1/chat/completions', {
+		method: 'POST',
+		headers: {
+			Authorization: `Bearer ${xaiKey}`,
+			'Content-Type': 'application/json'
+		},
+		body: JSON.stringify({
+			model: 'grok-4-1-fast',
+			messages: [
+				{
+					role: 'user',
+					content: `What are the top 3 breaking or trending stories on X/Twitter right now about ${category}? For each, give me: the topic, a one-line summary, the key tweets/sources, and why it matters. Focus on the last 12 hours.
+
+Return ONLY valid JSON, no markdown fences. Use this schema:
+[{"topic": "...", "summary": "...", "sources": "key accounts/tweets discussing this"}]`
+				}
+			],
+			search_parameters: { mode: 'auto', sources: [{ type: 'x' }] }
+		})
+	});
+
+	if (!res.ok) {
+		const err = await res.text();
+		throw new Error(`xAI API error (${res.status}): ${err}`);
+	}
+
+	const data = await res.json() as {
+		choices: Array<{ message: { content: string } }>;
+	};
+
+	const content = data.choices?.[0]?.message?.content;
+	if (!content) return [];
+
+	try {
+		const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+		return JSON.parse(cleaned) as XTrend[];
+	} catch {
+		return [];
+	}
+}
+
+// --- Brave web search ---
 
 async function braveSearch(query: string, braveKey: string, count: number = 5): Promise<SearchResult[]> {
 	const res = await fetch(
@@ -60,14 +113,101 @@ async function braveSearch(query: string, braveKey: string, count: number = 5): 
 	return (data.web?.results || []).map((r) => ({
 		title: r.title,
 		url: r.url,
-		description: r.description
+		description: r.description,
+		source: 'web' as const
 	}));
 }
 
-interface DiscoverResult {
+// --- Article generation helper ---
+
+interface ArticleFields {
+	title: string;
+	summary: string;
+	body: string;
+	category: string;
+	source: string;
+	read_time: number;
+	image_prompt: string;
+}
+
+async function generateArticle(
+	anthropicKey: string,
+	category: string,
+	articleText: string,
+	sourceName: string
+): Promise<ArticleFields> {
+	const raw = await chatCompletion(anthropicKey, SYSTEM_PROMPT, [
+		{ type: 'text', text: `Write a full analytical article based on this content. Use category: ${category}\n\n${articleText}` }
+	]);
+	const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+	const article = JSON.parse(cleaned) as ArticleFields;
+	article.category = category;
+	article.source = sourceName;
+	return article;
+}
+
+async function generateAndStoreImage(
+	googleKey: string,
+	storage: R2Bucket,
+	imagePrompt: string
+): Promise<string | null> {
+	try {
+		const imageB64 = await generateImage(googleKey, imagePrompt);
+		const imageKey = `images/${crypto.randomUUID()}.png`;
+		const imageBytes = Uint8Array.from(atob(imageB64), (c) => c.charCodeAt(0));
+		await storage.put(imageKey, imageBytes, {
+			httpMetadata: { contentType: 'image/png' }
+		});
+		return `/api/r2/${imageKey}`;
+	} catch {
+		return null;
+	}
+}
+
+async function insertStory(
+	db: D1Database,
+	article: ArticleFields,
+	imageUrl: string | null,
+	sourceUrl: string | null,
+	inputType: string,
+	originalInput: string
+): Promise<string> {
+	const storyId = crypto.randomUUID();
+	const contentHash = await computeHash(article.title + (sourceUrl || ''));
+	const publishedAt = new Date().toISOString();
+
+	await db
+		.prepare(
+			`INSERT INTO stories (id, title, summary, body, category, image_url, source, source_url, published_at, read_time, content_hash, input_type, original_input)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		)
+		.bind(
+			storyId,
+			article.title,
+			article.summary,
+			article.body,
+			article.category,
+			imageUrl,
+			article.source,
+			sourceUrl,
+			publishedAt,
+			article.read_time || 5,
+			contentHash,
+			inputType,
+			originalInput.slice(0, 2000)
+		)
+		.run();
+
+	return storyId;
+}
+
+// --- Main discover orchestrator ---
+
+export interface DiscoverResult {
 	id: string;
 	title: string;
 	category: string;
+	source: 'x' | 'web';
 }
 
 export async function discoverStories(options: {
@@ -76,10 +216,11 @@ export async function discoverStories(options: {
 	anthropicKey: string;
 	googleKey?: string;
 	braveKey: string;
+	xaiKey?: string;
 	categories?: string[];
 	count?: number;
 }): Promise<{ created: DiscoverResult[]; skipped: string[] }> {
-	const { db, storage, anthropicKey, googleKey, braveKey } = options;
+	const { db, storage, anthropicKey, googleKey, braveKey, xaiKey } = options;
 	const categories = options.categories?.length ? options.categories : Object.keys(SEARCH_QUERIES);
 	const countPerCategory = options.count || 1;
 
@@ -87,126 +228,122 @@ export async function discoverStories(options: {
 	const skipped: string[] = [];
 
 	for (const category of categories) {
-		const queries = SEARCH_QUERIES[category];
-		if (!queries) continue;
-
-		// Pick a random query for variety
-		const query = queries[Math.floor(Math.random() * queries.length)];
-
-		let results: SearchResult[];
-		try {
-			results = await braveSearch(query, braveKey, 5);
-		} catch (err) {
-			skipped.push(`${category}: search failed — ${err instanceof Error ? err.message : 'unknown'}`);
-			continue;
-		}
-
-		if (results.length === 0) {
-			skipped.push(`${category}: no search results`);
-			continue;
-		}
-
 		let generated = 0;
-		for (const result of results) {
-			if (generated >= countPerCategory) break;
 
-			// Quick dedup on source URL
-			const dupCheck = await checkDuplicate(db, result.title, result.url);
-			if (dupCheck.isDuplicate) {
-				skipped.push(`${category}: dup — ${result.title.slice(0, 60)}`);
-				continue;
-			}
-
-			// Fetch article content
-			let articleText: string;
-			let sourceName: string;
+		// --- Step 1: X/Twitter trends via Grok ---
+		if (xaiKey && generated < countPerCategory) {
 			try {
-				const content = await fetchUrlContent(result.url);
-				articleText = `Article Title: ${content.title}\n\nContent: ${content.text}`;
-				sourceName = content.siteName;
-			} catch {
-				// Fall back to search snippet
-				articleText = `Article Title: ${result.title}\n\nDescription: ${result.description}`;
-				sourceName = new URL(result.url).hostname.replace('www.', '');
-			}
+				const trends = await searchXTwitter(category, xaiKey);
+				for (const trend of trends) {
+					if (generated >= countPerCategory) break;
 
-			// Generate article via Claude
-			let article: {
-				title: string;
-				summary: string;
-				body: string;
-				category: string;
-				source: string;
-				read_time: number;
-				image_prompt: string;
-			};
-			try {
-				const raw = await chatCompletion(anthropicKey, SYSTEM_PROMPT, [
-					{ type: 'text', text: `Write a full analytical article based on this content. Use category: ${category}\n\n${articleText}` }
-				]);
-				const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-				article = JSON.parse(cleaned);
-				article.category = category;
-				article.source = sourceName;
-			} catch (err) {
-				skipped.push(`${category}: generation failed — ${err instanceof Error ? err.message : 'unknown'}`);
-				continue;
-			}
+					// Dedup on topic
+					const dupCheck = await checkDuplicate(db, trend.topic, null);
+					if (dupCheck.isDuplicate) {
+						skipped.push(`${category}/x: dup — ${trend.topic.slice(0, 60)}`);
+						continue;
+					}
 
-			// Second dedup check on generated title
-			const dupCheck2 = await checkDuplicate(db, article.title, result.url);
-			if (dupCheck2.isDuplicate) {
-				skipped.push(`${category}: dup after gen — ${article.title.slice(0, 60)}`);
-				continue;
-			}
+					const articleText = `Trending topic on X/Twitter: ${trend.topic}\n\nSummary: ${trend.summary}\n\nKey sources: ${trend.sources}\n\nThis is currently trending in the ${category} space on X/Twitter.`;
 
-			// Generate image
-			let imageUrl: string | null = null;
-			if (googleKey && storage) {
-				try {
-					const imageB64 = await generateImage(googleKey, article.image_prompt);
-					const imageKey = `images/${crypto.randomUUID()}.png`;
-					const imageBytes = Uint8Array.from(atob(imageB64), (c) => c.charCodeAt(0));
-					await storage.put(imageKey, imageBytes, {
-						httpMetadata: { contentType: 'image/png' }
-					});
-					imageUrl = `/api/r2/${imageKey}`;
-				} catch {
-					// Continue without image
+					let article: ArticleFields;
+					try {
+						article = await generateArticle(anthropicKey, category, articleText, 'X / Twitter');
+					} catch (err) {
+						skipped.push(`${category}/x: gen failed — ${err instanceof Error ? err.message : 'unknown'}`);
+						continue;
+					}
+
+					const dupCheck2 = await checkDuplicate(db, article.title, null);
+					if (dupCheck2.isDuplicate) {
+						skipped.push(`${category}/x: dup after gen — ${article.title.slice(0, 60)}`);
+						continue;
+					}
+
+					const imageUrl = (googleKey && storage)
+						? await generateAndStoreImage(googleKey, storage, article.image_prompt)
+						: null;
+
+					const storyId = await insertStory(db, article, imageUrl, null, 'x-trend', trend.topic);
+					created.push({ id: storyId, title: article.title, category, source: 'x' });
+					generated++;
 				}
+			} catch (err) {
+				skipped.push(`${category}/x: search failed — ${err instanceof Error ? err.message : 'unknown'}`);
+			}
+		}
+
+		// --- Step 2: Brave web search ---
+		if (generated < countPerCategory) {
+			const queries = SEARCH_QUERIES[category];
+			if (!queries) continue;
+
+			const query = queries[Math.floor(Math.random() * queries.length)];
+
+			let results: SearchResult[];
+			try {
+				results = await braveSearch(query, braveKey, 5);
+			} catch (err) {
+				skipped.push(`${category}/web: search failed — ${err instanceof Error ? err.message : 'unknown'}`);
+				continue;
 			}
 
-			// Insert
-			const storyId = crypto.randomUUID();
-			const contentHash = await computeHash(article.title + result.url);
-			const publishedAt = new Date().toISOString();
+			if (results.length === 0) {
+				skipped.push(`${category}/web: no search results`);
+				continue;
+			}
 
-			await db
-				.prepare(
-					`INSERT INTO stories (id, title, summary, body, category, image_url, source, source_url, published_at, read_time, content_hash, input_type, original_input)
-					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-				)
-				.bind(
-					storyId,
-					article.title,
-					article.summary,
-					article.body,
-					article.category,
-					imageUrl,
-					article.source,
-					result.url,
-					publishedAt,
-					article.read_time || 5,
-					contentHash,
-					'discover',
-					result.url
-				)
-				.run();
+			for (const result of results) {
+				if (generated >= countPerCategory) break;
 
-			created.push({ id: storyId, title: article.title, category });
-			generated++;
+				const dupCheck = await checkDuplicate(db, result.title, result.url);
+				if (dupCheck.isDuplicate) {
+					skipped.push(`${category}/web: dup — ${result.title.slice(0, 60)}`);
+					continue;
+				}
+
+				let articleText: string;
+				let sourceName: string;
+				try {
+					const content = await fetchUrlContent(result.url);
+					articleText = `Article Title: ${content.title}\n\nContent: ${content.text}`;
+					sourceName = content.siteName;
+				} catch {
+					articleText = `Article Title: ${result.title}\n\nDescription: ${result.description}`;
+					sourceName = new URL(result.url).hostname.replace('www.', '');
+				}
+
+				let article: ArticleFields;
+				try {
+					article = await generateArticle(anthropicKey, category, articleText, sourceName);
+				} catch (err) {
+					skipped.push(`${category}/web: gen failed — ${err instanceof Error ? err.message : 'unknown'}`);
+					continue;
+				}
+
+				const dupCheck2 = await checkDuplicate(db, article.title, result.url);
+				if (dupCheck2.isDuplicate) {
+					skipped.push(`${category}/web: dup after gen — ${article.title.slice(0, 60)}`);
+					continue;
+				}
+
+				const imageUrl = (googleKey && storage)
+					? await generateAndStoreImage(googleKey, storage, article.image_prompt)
+					: null;
+
+				const storyId = await insertStory(db, article, imageUrl, result.url, 'discover', result.url);
+				created.push({ id: storyId, title: article.title, category, source: 'web' });
+				generated++;
+			}
 		}
 	}
+
+	// Sort: X-sourced stories first (they're breaking/trending)
+	created.sort((a, b) => {
+		if (a.source === 'x' && b.source !== 'x') return -1;
+		if (a.source !== 'x' && b.source === 'x') return 1;
+		return 0;
+	});
 
 	return { created, skipped };
 }

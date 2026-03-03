@@ -8,6 +8,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	const anthropicKey = platform?.env?.ANTHROPIC_API_KEY;
 	const googleKey = platform?.env?.GOOGLE_API_KEY;
 	const braveKey = platform?.env?.BRAVE_API_KEY;
+	const xaiKey = platform?.env?.XAI_API_KEY;
 	const cronSecret = platform?.env?.CRON_SECRET;
 
 	if (!db) return json({ error: 'Database not available' }, { status: 503 });
@@ -34,6 +35,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 			anthropicKey,
 			googleKey,
 			braveKey,
+			xaiKey,
 			count: 2 // 2 per category = up to 14 total
 		});
 
