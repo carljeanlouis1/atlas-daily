@@ -4,4 +4,4 @@ compatibility_date = "2024-09-23"
 [[d1_databases]]
 binding = "DB"
 database_name = "atlas-daily-db"
-database_id = "local"
+database_id = "4b727b1b-6743-48a2-991a-98de63a9eb84"
